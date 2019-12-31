@@ -9,6 +9,7 @@ import math
 import os
 from .global_vars import imu
 import binascii
+from .file_storage import OpenIMULog
 from .predefine import (
     app_str,
     string_folder_path
@@ -28,21 +29,23 @@ class WSHandler(tornado.websocket.WebSocketHandler):
         self.callback2 = tornado.ioloop.PeriodicCallback(self.detect_status, 500)
         self.callback2.start()
 
-    def detect_status(self):        
+
+    def detect_status(self):
         if not imu.read(200):
             self.write_message(json.dumps({ "messageType": "queryResponse","data": {"packetType": "DeviceStatus","packet": { "returnStatus":1}}}))
 
     def send_data(self):
-        if not imu.device_id:            
+        if not imu.device_id:
             self.write_message(json.dumps({ "messageType": "queryResponse","data": {"packetType": "DeviceStatus","packet": { "returnStatus":1}}}))
             time.sleep(1)
         if not imu.paused:
             d = imu.get_latest()
-            self.write_message(json.dumps({ 'messageType' : 'event',  'data' : { 'newOutput' : d }}))               
+            self.write_message(json.dumps({ 'messageType' : 'event',  'data' : { 'newOutput' : d }}))
         else:
             return False
 
     def on_message(self, message):
+        
         global imu
 
         message = json.loads(message)
@@ -59,20 +62,20 @@ class WSHandler(tornado.websocket.WebSocketHandler):
                 fileName = imu.logger.user['fileName']
             else:
                 fileName = ''
-            
+
             # Load the basic openimu.json(IMU application)
             #with open('app_config/IMU/openimu.json') as json_data:
             #    imu.imu_properties = json.load(json_data)
-            application_type = bytes.decode(imu.openimu_get_user_app_id())           
+            application_type = bytes.decode(imu.openimu_get_user_app_id())
             # application_type = imu.device_id
             for idx, item in enumerate(app_str):
                 if item in application_type:
                     folder_path = string_folder_path.replace('APP_TYP',item)
-                    break   
-                            
-            # load application type from firmware 
+                    break
+
+            # load application type from firmware
             try:
-                if imu.paused == 1 and not imu.openimu_get_user_app_id() == None: 
+                if imu.paused == 1 and not imu.openimu_get_user_app_id() == None:
                     with open(folder_path) as json_data:
                             imu.imu_properties = json.load(json_data)
                     js_version_str = imu.imu_properties['app_version'].split(' ')[2]
@@ -83,17 +86,17 @@ class WSHandler(tornado.websocket.WebSocketHandler):
                     self.write_message(json.dumps({ "messageType": "queryResponse","data": {"packetType": "DeviceStatus","packet": { "returnStatus":2}}}))
                     imu.pause()
             except Exception as e:
-                # print(e)                 
+                # print(e)
                 self.write_message(json.dumps({ "messageType": "queryResponse","data": {"packetType": "DeviceStatus","packet": { "returnStatus":2}}}))
                 imu.pause()
         elif message['messageType'] == 'requestAction':
-            if list(message['data'].keys())[0] == 'gA':                
+            if list(message['data'].keys())[0] == 'gA':
                 data = imu.openimu_get_all_param()
 
                 # data[7]['value'] = data[3]['value'].strip(b'\x00'.decode())
                 time.sleep(0.2)
                 self.write_message(json.dumps({ "messageType" : "requestAction", "data" : { "gA" : data }}))
-                # print('requesting ok ---------------{0}'.format(self.count))                
+                # print('requesting ok ---------------{0}'.format(self.count))
             elif list(message['data'].keys())[0] == 'uP':
                 data = imu.openimu_update_param(message['data']['uP']['paramId'], message['data']['uP']['value'])
                 self.write_message(json.dumps({ "messageType" : "requestAction", "data" : { "uP" : data }}))
@@ -105,21 +108,21 @@ class WSHandler(tornado.websocket.WebSocketHandler):
             elif list(message['data'].keys())[0] == 'gV':
                 data = imu.openimu_get_user_app_id()
                 self.write_message(json.dumps({ "messageType" : "completeAction", "data" : { "gV" : str(data) }}))
-            elif list(message['data'].keys())[0] == 'startStream':                                
+            elif list(message['data'].keys())[0] == 'startStream':
                 imu.connect()
-                self.callback.start()  
+                self.callback.start()
                 self.callback2.stop()
                 self.write_message(json.dumps({ "messageType" : "requestAction", "data" : { "startStream" : {} }}))
             elif list(message['data'].keys())[0] == 'stopStream':
                 imu.pause()
                 self.callback2.start()
                 self.write_message(json.dumps({ "messageType" : "requestAction", "data" : { "stopStream" : {} }}))
-            elif list(message['data'].keys())[0] == 'startLog' and imu.logging == 0: 
+            elif list(message['data'].keys())[0] == 'startLog' and imu.logging == 0:
                 data = message['data']['startLog']
                 imu.start_log(data)
                 self.write_message(json.dumps({ "messageType" : "requestAction", "data" : { "logfile" : imu.logger.name }}))
-            elif list(message['data'].keys())[0] == 'stopLog' and imu.logging == 1: 
-                imu.stop_log()                
+            elif list(message['data'].keys())[0] == 'stopLog' and imu.logging == 1:
+                imu.stop_log()
                 self.write_message(json.dumps({ "messageType" : "requestAction", "data" : { "logfile" : '' }}))
             # added by Dave, app download page
             elif list(message['data'].keys())[0] == 'upgradeFramework':
@@ -182,9 +185,9 @@ class WSHandler(tornado.websocket.WebSocketHandler):
                 f = open("data/" + message['data']['loadFile']['graph_id'],"r")
                 self.write_message(json.dumps({ "messageType" : "requestAction", "data" : { "loadFile" :  f.read() }}))
 
-    def on_close(self): 
+    def on_close(self):
         if(imu.logging == 1):
-            imu.stop_log() 
+            imu.stop_log()
         imu.pause()
         self.callback.stop()
         self.callback2.stop()
@@ -193,4 +196,3 @@ class WSHandler(tornado.websocket.WebSocketHandler):
 
     def check_origin(self, origin):
         return True
-    

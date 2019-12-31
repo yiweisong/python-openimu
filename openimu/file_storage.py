@@ -4,7 +4,7 @@ import json
 import requests
 import threading
 
-# need to find something python3 compatible  
+# need to find something python3 compatible
 # import urllib2
 
 from azure.storage.blob import AppendBlobService
@@ -12,7 +12,7 @@ from azure.storage.blob import ContentSettings
 from azure.storage.blob import BlockBlobService
 
 class OpenIMULog:
-    
+
     def __init__(self, imu, user = False):
         '''Initialize and create a CSV file
         '''
@@ -62,7 +62,7 @@ class OpenIMULog:
                           ']'''
                 dataStr = output_packet['payload'][keyIdx]['name'] + "(" + output_packet['payload'][keyIdx]['unit'] + ")"
                 labels = labels + '{0:s},'.format(dataStr)
-            
+
             # Remove the comma at the end of the string and append a new-line character
             labels = labels[:-1]
             header = labels + '\n'
@@ -101,21 +101,21 @@ class OpenIMULog:
                 print(0)
                 str += '{0:3.5f},'.format(data[key])
 
-        # 
+        #
         str = str[:-1]
         str = str + '\n'
         self.file.write(header+str)
 
     def write_to_azure(self):
-        # check for internet 
-        # if not self.internet_on(): 
+        # check for internet
+        # if not self.internet_on():
         #    return False
 
         # record file to cloud
         # f = open("data/" + self.name,"r")
         f = open("data/" + self.user['fileName'], "r")
         text = f.read()
-       
+
 
 
 
@@ -134,34 +134,60 @@ class OpenIMULog:
 
         # record record to ansplatform
         self.record_to_ansplatform()
-        
-        
+
+
     def record_to_ansplatform(self):
         # data = { "pn" : self.pn, "sn": self.sn, "fileName" : self.user['fileName'],  "url" : self.name, "imuProperties" : json.dumps(self.imu_properties),
         #          "sampleRate" : self.odr_setting, "packetType" : self.packet_type, "userId" : self.user['id'] }
-        data = { 
-                    "type":"IMU", 
-                    "fileName" : self.user['fileName'], 
+        data = {
+                    "type":"IMU",
+                    "fileName" : self.user['fileName'],
                     "url" : self.name,
-                    "userId" : self.user['id'], 
+                    "userId" : self.user['id'],
                     "model" : "IMU300",
                     "logInfo": {
-                        "pn" : self.pn, 
-                        "sn": self.sn, 
-                        "sampleRate" : self.odr_setting, 
+                        "pn" : self.pn,
+                        "sn": self.sn,
+                        "sampleRate" : self.odr_setting,
                         "packetType" : self.packet_type,
                         "appVersion" : self.imu_properties['appName'] if 'appName' in self.imu_properties else '',
                         "imuProperties" : json.dumps(self.imu_properties)
-                    } 
+                    }
                 }
         # host_address='http://40.118.233.18:3000/'
-        host_address='https://api.aceinna.com/'        
+        host_address='https://api.aceinna.com/'
         url = host_address + "api/recordLogs/post" #"https://api.aceinna.com/api/datafiles/replaceOrCreate"
         data_json = json.dumps(data)
         headers = {'Content-type': 'application/json', 'Authorization' : self.user['access_token'] }
         response = requests.post(url, data=data_json, headers=headers)
         response = response.json()
-       
+
+        # clean up
+        self.name = ''
+
+        return  #ends thread
+
+    def record_drive_test(self):
+        print("in drive test")
+        # data = { "pn" : self.pn, "sn": self.sn, "fileName" : self.user['fileName'],  "url" : self.name, "imuProperties" : json.dumps(self.imu_properties),
+        #          "sampleRate" : self.odr_setting, "packetType" : self.packet_type, "userId" : self.user['id'] }
+        data = {
+                    "device":"IMU",
+                    "driver" : "python-openimu",
+                    "fileUrl" : "test",
+                    "userId" : "first commit",
+                    "fileName" : "IMU300",
+                    "graphs": True
+                }
+        # host_address='http://40.118.233.18:3000/'
+        host_address='http://localhost:3000/'
+        # host_address='https://api.aceinna.com/'
+        url = host_address + "api/Drive/post" #"https://api.aceinna.com/api/datafiles/replaceOrCreate"
+        data_json = json.dumps(data)
+        headers = {'Content-type': 'application/json', 'Authorization' : self.user['access_token'] }
+        response = requests.post(url, data=data_json, headers=headers)
+        response = response.json()
+
         # clean up
         self.name = ''
 
@@ -171,7 +197,7 @@ class OpenIMULog:
         try:
             urllib2.urlopen('https://ans-platform.azurewebsites.net', timeout=1)
             return True
-        except urllib2.URLError as err: 
+        except urllib2.URLError as err:
             return False
 
 
