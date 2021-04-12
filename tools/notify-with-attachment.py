@@ -12,7 +12,7 @@ receivers = ['ywsong@aceinna.com']
 message = MIMEMultipart()
 #message['From'] = Header("notifications@aceinna.com", 'utf-8')
 #message['To'] = "ywsong"
-subject = 'CI Executable'
+subject = '[{}] CI Executable'.format(sys)
 message['Subject'] = Header(subject, 'utf-8')
 
 message.attach(
@@ -24,7 +24,7 @@ file_name = 'ans-devices.exe' if sys == "Windows" else 'ans-devices'
 att1 = MIMEText(open(os.path.join(os.getcwd(), 'dist', file_name),
                      'rb').read(), 'base64', 'utf-8')
 att1["Content-Type"] = 'application/octet-stream'
-att1["Content-Disposition"] = 'attachment; filename="test.txt"'
+att1["Content-Disposition"] = 'attachment; filename="{0}"'.format(file_name)
 message.attach(att1)
 
 try:
